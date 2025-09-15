@@ -11,7 +11,7 @@
 # and parameters, see https://github.com/anchore/sbom-action. For more
 # information about the Anchore SBOM tool, Syft, see
 # https://github.com/anchore/syft
-name: Bogazici-DevSecOps-Pipeline
+nname: Bogazici-DevSecOps-Pipeline
 
 on:
   push:
@@ -20,20 +20,25 @@ on:
   pull_request:
 
 jobs:
-  build-and-syft:
-    name: Build & SBOM + Semgrep
+  build-and-secure:
+    name: Build & Security Scans
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: |
-          docker build -t juice-shop:${{ github.sha }} .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
+      - name: Build Docker image
+        run: docker build -t juice-shop:${{ github.sha }} .
+
+      # ------------------------
+      # SBOM with Syft
+      # ------------------------
       - name: Syft SBOM Scan
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v1
         with:
           image: "juice-shop:${{ github.sha }}"
           output-file: "sbom.spdx.json"
@@ -45,6 +50,9 @@ jobs:
           name: sbom
           path: sbom.spdx.json
 
+      # ------------------------
+      # Semgrep Scan
+      # ------------------------
       - name: Semgrep Scan
         uses: returntocorp/semgrep-action@v2
         with:
@@ -57,3 +65,18 @@ jobs:
         with:
           name: semgrep-results
           path: semgrep-results.json
+
+      # ------------------------
+      # Gitleaks Scan
+      # ------------------------
+      - name: Gitleaks Scan
+        uses: zricethezav/gitleaks-action@v2
+        with:
+          output: gitleaks-results.json
+          format: json
+
+      - name: Upload Gitleaks results
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-results
+          path: gitleaks-results.json
