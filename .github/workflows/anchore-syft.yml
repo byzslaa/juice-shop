@@ -11,28 +11,46 @@
 # and parameters, see https://github.com/anchore/sbom-action. For more
 # information about the Anchore SBOM tool, Syft, see
 # https://github.com/anchore/syft
-name: Anchore Syft SBOM scan
+name: Security Scan
 
 on:
   push:
     branches: [ "master" ]
-
-permissions:
-  contents: write
+  pull_request:
 
 jobs:
-  Anchore-Build-Scan:
-    permissions:
-      contents: write # required to upload to the Dependency submission API
+  build-and-scan:
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout the code
-      uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag localbuild/testimage:latest
-    - name: Scan the image and upload dependency results
-      uses: anchore/sbom-action@bb716408e75840bbb01e839347cd213767269d4a
-      with:
-        image: "localbuild/testimage:latest"
-        artifact-name: image.spdx.json
-        dependency-snapshot: true
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Burada projenin build aşamasını koymalısın. Örneğin:
+      # Node.js için:
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+      # Syft yükle
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      # Syft çalıştır
+      - name: Run Syft
+        run: syft dir:. -o json > sbom.json
+
+      # Çıktıyı artifacts içine yükle
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
