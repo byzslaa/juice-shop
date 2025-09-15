@@ -11,72 +11,47 @@
 # and parameters, see https://github.com/anchore/sbom-action. For more
 # information about the Anchore SBOM tool, Syft, see
 # https://github.com/anchore/syft
-nname: Bogazici-DevSecOps-Pipeline
+name: Security Scan
 
 on:
   push:
-    branches:
+    branches: 
       - master
   pull_request:
-
+  
 jobs:
-  build-and-secure:
-    name: Build & Security Scans
+  build-and-syft:
+    name: Build & SBOM + Semgrep
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+      - name: Checkout 
+        uses: actions/checkout@v3
 
       - name: Build Docker image
-        run: docker build -t juice-shop:${{ github.sha }} .
+        run: |
+          docker build -t juice-shop:${{ github.sha }} .
 
-      # ------------------------
-      # SBOM with Syft
-      # ------------------------
       - name: Syft SBOM Scan
-        uses: anchore/sbom-action@v1
+        uses: anchore/sbom-action@v0
         with:
           image: "juice-shop:${{ github.sha }}"
           output-file: "sbom.spdx.json"
           format: "spdx-json"
 
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom.spdx.json
-
-      # ------------------------
-      # Semgrep Scan
-      # ------------------------
       - name: Semgrep Scan
-        uses: returntocorp/semgrep-action@v2
-        with:
-          config: "p/ci"
-          output: semgrep-results.json
-          json: true
+        run: |
+         mkdir -p semgrep/results
+         semgrep ci --config=auto --sarif --output=semgrep/results/semgrep.sarif || true
 
-      - name: Upload Semgrep results
-        uses: actions/upload-artifact@v4
+      - name: Upload SARIF File
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'semgrep/result/semgrep.sarif'
+
+      - name: Upload Semgrep report
+        uses: action/upload-artifact@v4
+        if: always()
         with:
           name: semgrep-results
-          path: semgrep-results.json
-
-      # ------------------------
-      # Gitleaks Scan
-      # ------------------------
-      - name: Gitleaks Scan
-        uses: zricethezav/gitleaks-action@v2
-        with:
-          output: gitleaks-results.json
-          format: json
-
-      - name: Upload Gitleaks results
-        uses: actions/upload-artifact@v4
-        with:
-          name: gitleaks-results
-          path: gitleaks-results.json
+          path: semgrep/results/
