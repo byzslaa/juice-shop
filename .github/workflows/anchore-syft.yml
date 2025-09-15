@@ -15,29 +15,29 @@ name: Bogazici-DevSecOps-Pipeline
 
 on:
   push:
-    branches: 
+    branches:
       - master
   pull_request:
 
 jobs:
- build-and-syft:
-  name: Build & SBOM
-  runs-on: ubuntu-latest
+  build-and-syft:
+    name: Build & SBOM + Semgrep
+    runs-on: ubuntu-latest
 
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Build Docker image
-      run: |
-        docker build -t juice-shop:${{ github.sha }} .
+      - name: Build Docker image
+        run: |
+          docker build -t juice-shop:${{ github.sha }} .
 
-    - name: Syft SBOM Scan
-      uses: anchore/sbom-action@v0
-      with:
-        image: "juice-shop:${{ github.sha }}"
-        output-file: "sbom.spdx.json"
-        format: "spdx-json"
+      - name: Syft SBOM Scan
+        uses: anchore/sbom-action@v0
+        with:
+          image: "juice-shop:${{ github.sha }}"
+          output-file: "sbom.spdx.json"
+          format: "spdx-json"
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
@@ -48,7 +48,7 @@ jobs:
       - name: Semgrep Scan
         uses: returntocorp/semgrep-action@v2
         with:
-          config: "p/ci"        # veya kendi kuralların: ./semgrep-rules
+          config: "p/ci"
           output: semgrep-results.json
           json: true
 
@@ -57,4 +57,3 @@ jobs:
         with:
           name: semgrep-results
           path: semgrep-results.json
-
